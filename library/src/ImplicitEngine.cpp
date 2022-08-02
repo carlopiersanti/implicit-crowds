@@ -27,11 +27,13 @@
 
 #define _INFTY 9e9
 
-double radius_obstacle = 1.0f;
-double x_obstacle = 0.0f;
-double y_obstacle = 0.0f;
+double radius_obstacle1 = 1.0f;
+double x_obstacle1 = 0.0f;
+double y_obstacle1 = 1.5f;
 
-
+double radius_obstacle2 = 1.0f;
+double x_obstacle2 = 0.0f;
+double y_obstacle2 = -1.5f;
 
 ImplicitEngine::ImplicitEngine()
 {
@@ -233,16 +235,34 @@ double ImplicitEngine::value(const VectorXd &vNew)
 
 			}
 			{
-				double radius = _radius[i] + radius_obstacle;
+				double radius = _radius[i] + radius_obstacle1;
 				double distance_energy = 0;
 				double g[] = { 0, 0 };
-				if ( min_distance_energy(_pos[i], _pos[id_y], x_obstacle, y_obstacle,
+				if ( min_distance_energy(_pos[i], _pos[id_y], x_obstacle1, y_obstacle1,
 					vNew[i], vNew[id_y], 0.0, 0.0, radius, distance_energy, g))
 					exit = true;
 				else
 				{
 					// compute the ttc energy
-					double ttc_energy = inverse_ttc_energy(_posNew[i], _posNew[id_y], x_obstacle, y_obstacle,
+					double ttc_energy = inverse_ttc_energy(_posNew[i], _posNew[id_y], x_obstacle1, y_obstacle1,
+						vNew[i], vNew[id_y], 0.0, 0.0, radius, g);
+
+					f += /*2**/ttc_energy;
+					f += /*2**/distance_energy;
+				}
+			}
+
+			{
+				double radius = _radius[i] + radius_obstacle2;
+				double distance_energy = 0;
+				double g[] = { 0, 0 };
+				if (min_distance_energy(_pos[i], _pos[id_y], x_obstacle2, y_obstacle2,
+					vNew[i], vNew[id_y], 0.0, 0.0, radius, distance_energy, g))
+					exit = true;
+				else
+				{
+					// compute the ttc energy
+					double ttc_energy = inverse_ttc_energy(_posNew[i], _posNew[id_y], x_obstacle2, y_obstacle2,
 						vNew[i], vNew[id_y], 0.0, 0.0, radius, g);
 
 					f += /*2**/ttc_energy;
@@ -311,26 +331,52 @@ double ImplicitEngine::value(const VectorXd &vNew, VectorXd &grad)
 				}
 			}
 
-			double radius = _radius[i] + radius_obstacle;
-			double distance_energy = 0;
-			double g[] = { 0, 0 };
-			if (min_distance_energy(_pos[i], _pos[id_y], x_obstacle, y_obstacle,
-				vNew[i], vNew[id_y], 0.0, 0.0, radius, distance_energy, g))
-				exit = true;
-			else
 			{
-				// compute the ttc energy
-				double ttc_energy = inverse_ttc_energy(_posNew[i], _posNew[id_y], x_obstacle, y_obstacle,
-					vNew[i], vNew[id_y], 0.0, 0.0, radius, g);
+				double radius = _radius[i] + radius_obstacle1;
+				double distance_energy = 0;
+				double g[] = { 0, 0 };
+				if (min_distance_energy(_pos[i], _pos[id_y], x_obstacle1, y_obstacle1,
+					vNew[i], vNew[id_y], 0.0, 0.0, radius, distance_energy, g))
+					exit = true;
+				else
+				{
+					// compute the ttc energy
+					double ttc_energy = inverse_ttc_energy(_posNew[i], _posNew[id_y], x_obstacle1, y_obstacle1,
+						vNew[i], vNew[id_y], 0.0, 0.0, radius, g);
 
-				f += /*2**/ttc_energy;
-				f += /*2**/distance_energy;
+					f += /*2**/ttc_energy;
+					f += /*2**/distance_energy;
 
-				//add the gradients 
-				//In theory we could set the gradient of the neihbor to be the opposite of grad, but assuming openmp is used
-				//it's faster to recompute the energy and does not lead to any shared violations
-				grad[i] += /*2**/g[0];
-				grad[id_y] += /*2**/g[1];
+					//add the gradients 
+					//In theory we could set the gradient of the neihbor to be the opposite of grad, but assuming openmp is used
+					//it's faster to recompute the energy and does not lead to any shared violations
+					grad[i] += /*2**/g[0];
+					grad[id_y] += /*2**/g[1];
+				}
+			}
+
+			{
+				double radius = _radius[i] + radius_obstacle2;
+				double distance_energy = 0;
+				double g[] = { 0, 0 };
+				if (min_distance_energy(_pos[i], _pos[id_y], x_obstacle2, y_obstacle2,
+					vNew[i], vNew[id_y], 0.0, 0.0, radius, distance_energy, g))
+					exit = true;
+				else
+				{
+					// compute the ttc energy
+					double ttc_energy = inverse_ttc_energy(_posNew[i], _posNew[id_y], x_obstacle2, y_obstacle2,
+						vNew[i], vNew[id_y], 0.0, 0.0, radius, g);
+
+					f += /*2**/ttc_energy;
+					f += /*2**/distance_energy;
+
+					//add the gradients 
+					//In theory we could set the gradient of the neihbor to be the opposite of grad, but assuming openmp is used
+					//it's faster to recompute the energy and does not lead to any shared violations
+					grad[i] += /*2**/g[0];
+					grad[id_y] += /*2**/g[1];
+				}
 			}
 		}
 	}
@@ -373,8 +419,8 @@ bool ImplicitEngine::min_distance_energy(double Pa_x, double Pa_y, double Pb_x, 
 		double tti_prime_x = 0, tti_prime_y = 0;
 		if (tti > 0 && tti < _dt)
 		{
-			double tti_prime_x = (Xx - 2 * tti*Vx) / speed;
-			double tti_prime_y = (Xy - 2 * tti*Vy) / speed;
+			double tti_prime_x = (Xx - 2 * tti * Vx) / speed;
+			double tti_prime_y = (Xy - 2 * tti * Vy) / speed;
 		}
 		double scale = -_eta / (d * distance * distance);
 		double distance_prime_x = dx*(tti + Vx*tti_prime_x) + dy*(Vy*tti_prime_x);
