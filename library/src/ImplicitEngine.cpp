@@ -201,7 +201,7 @@ double ImplicitEngine::value(const VectorXd &vNew)
 	double f = 0.5*_dt*((vNew - _vel).array().square()).sum() + 0.5*_ksi*((vNew - _vGoal).array().square()).sum();
 
 	bool exit = false;
-	#pragma omp parallel for shared(exit) reduction(+:f) num_threads(_max_threads)
+	//#pragma omp parallel for shared(exit) reduction(+:f) num_threads(_max_threads)
 	for (int i = 0; i < _activeAgents; ++i)
 	{
 		if (!exit)
@@ -290,7 +290,7 @@ double ImplicitEngine::value(const VectorXd &vNew, VectorXd &grad)
 
 	bool exit = false;
 	//Agents
-	#pragma omp parallel for shared(exit) reduction(+:f) num_threads(_max_threads)
+	//#pragma omp parallel for shared(exit) reduction(+:f) num_threads(_max_threads)
 	for (int i = 0; i < _activeAgents; ++i)
 	{
 		if (!exit)
@@ -301,7 +301,7 @@ double ImplicitEngine::value(const VectorXd &vNew, VectorXd &grad)
 				const ImplicitAgent* other = static_cast<ImplicitAgent*>(_nn[i][j]);
 				int other_id = other->activeID();
 				//int other_id = this->_mappedIds[other->id()];
-				if (other_id != i)
+				if (other_id > i)
 				{
 					size_t other_id_y = other_id + _activeAgents;
 					double radius = _radius[i] + _radius[other_id];
@@ -316,17 +316,18 @@ double ImplicitEngine::value(const VectorXd &vNew, VectorXd &grad)
 						double ttc_energy = inverse_ttc_energy(_posNew[i], _posNew[id_y], _posNew[other_id], _posNew[other_id_y],
 							vNew[i], vNew[id_y], vNew[other_id], vNew[other_id_y], radius, g);
 
-						if (other_id > i) { // do not add the energy twice!  
+						//if (other_id > i) { // do not add the energy twice!  
 							f += ttc_energy;
 							f += distance_energy;
-						}
+						//}
 
 						//add the gradients 
 						//In theory we could set the gradient of the neihbor to be the opposite of grad, but assuming openmp is used
 						//it's faster to recompute the energy and does not lead to any shared violations
 						grad[i] += g[0];
 						grad[id_y] += g[1];
-
+						grad[other_id] -= g[0];
+						grad[other_id_y] -= g[1];
 					}
 				}
 			}
